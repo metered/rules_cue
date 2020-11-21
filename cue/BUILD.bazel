@@ -1,3 +1,5 @@
+load("@rules_python//python:defs.bzl", "py_binary")
+
 package(default_visibility = ["//visibility:public"])
 
 exports_files(glob(["*.bzl"]))
@@ -34,4 +36,10 @@ genrule(
     outs = ["bin/cue"],
     cmd = "cp $(<) $(@)",
     executable = True,
+)
+
+py_binary(
+    name = "render_json",
+    srcs = ["render_json.py"],
+    visibility = ["//visibility:public"],
 )

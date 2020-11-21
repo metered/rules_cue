@@ -2,6 +2,40 @@ load("@bazel_tools//tools/build_defs/repo:http.bzl", "http_archive")
 load("@bazel_gazelle//:deps.bzl", "gazelle_dependencies", "go_repository")
 
 _cue_runtimes = {
+    "0.3.0-alpha4": [
+        {
+            "os": "Linux",
+            "arch": "x86_64",
+            "sha256": "ba54e55d91ffc430fdb83116b2bf4b0e284083396e5ca63af3fad742c2920da5",
+        },
+        {
+            "os": "Darwin",
+            "arch": "x86_64",
+            "sha256": "659912f149bb1534c2e72baae31e3d4de108b292af3907f402d25fa101f80d98",
+        },
+        {
+            "os": "Windows",
+            "arch": "x86_64",
+            "sha256": "820b581e7285b78644d4bcfd1a0bd2c9f2153ddc4880c501a7423ab7992dc778",
+        },
+    ],
+    "0.2.2": [
+        {
+            "os": "Linux",
+            "arch": "x86_64",
+            "sha256": "810851e0e7d38192a6d0e09a6fa89ab5ff526ce29c9741f697995601edccb134",
+        },
+        {
+            "os": "Darwin",
+            "arch": "x86_64",
+            "sha256": "d782602b0387d19cb004eab90b47d51bb207007396450153af751ce7581228be",
+        },
+        {
+            "os": "Windows",
+            "arch": "x86_64",
+            "sha256": "062d17ea61eec8065af02433277ef42833fc8f139202c5743c31bcf316c0431a",
+        },
+    ],
     "0.2.0": [
         {
             "os": "Linux",
@@ -55,7 +89,7 @@ _cue_runtimes = {
     ]
 }
 
-def cue_register_toolchains(version = "0.2.0"):
+def cue_register_toolchains(version = "0.3.0-alpha4"):
     for platform in _cue_runtimes[version]:
         suffix = "tar.gz"
         if platform["os"] == "Windows":
