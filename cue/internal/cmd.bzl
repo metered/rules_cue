@@ -1,56 +1,29 @@
 load(":common.bzl", _zip_src = "zip_src", _pkg_merge = "pkg_merge", _cue_deps_attr = "cue_deps_attr")
 
-def _strip_extension(path):
-    """Removes the final extension from a path."""
-    components = path.split(".")
-    components.pop()
-    return ".".join(components)
-
-def _cue_export_outputs(src, srcs, output_name, output_format):
-    """Get map of cue_export outputs.
+def _cue_cmd_outputs(output_name):
+    """Get map of cue_cmd outputs.
     Note that the arguments to this function are named after attributes on the rule.
     Args:
-      src: The rule's `src` attribute
       output_name: The rule's `output_name` attribute
-      output_format: The rule's `output_format` attribute
     Returns:
-      Outputs for the cue_export
+      Outputs for the cue_cmd
     """
 
-    if not src:
-        if len(srcs):
-            src = srcs[0]
-        elif not output_name:
-            fail("must specify 'src', 'srcs', or 'output_name'")
-
     outputs = {
-        "export": output_name or _strip_extension(src.name) + "." + output_format,
+        "export": output_name,
     }
 
     return outputs
 
-_cue_export_attrs = {
-    "src": attr.label(
-        doc = "Cue entrypoint file",
-        # mandatory = True,
-        allow_single_file = [".cue"],
-    ),
-    "json": attr.string(),
+_cue_cmd_attrs = {
     "srcs": attr.label_list(
         doc = "Cue entrypoint files",
         # mandatory = True,
         allow_files = [".cue"],
     ),
-    "expression": attr.string(),
-    "escape": attr.bool(
-        default = False,
-        doc = "Use HTML escaping.",
-    ),
     "verbose": attr.bool(),
     "trace": attr.bool(),
-    "all_errors": attr.bool(),
     
-    #debug            give detailed error info
     #ignore           proceed in the presence of errors
     #simplify         simplify output
     #trace            trace computation
@@ -64,15 +37,8 @@ Note that some tooling may assume that the output name is derived from
 the input name, so use this attribute with caution.""",
         default = "",
     ),
-    "output_format": attr.string(
-        doc = "Output format",
-        default = "json",
-        values = [
-            "json",
-            "yaml",
-            "text",
-            "cue",
-        ],
+    "cmd": attr.string(
+        mandatory = True,
     ),
     "inject": attr.string_dict(),
     "inject_files": attr.label_keyed_string_dict(),
@@ -100,15 +66,10 @@ the input name, so use this attribute with caution.""",
     )
 }
 
-def _cue_export_impl(ctx):
-    """_cue_export performs an action to export a single Cue file."""
+def _cue_cmd_impl(ctx):
+    """_cue_cmd performs an action to export a single Cue file."""
 
-    srcs = [ctx.file.src] if ctx.file.src else list(ctx.files.srcs)
-    if ctx.attr.json:
-        json_values_file = ctx.actions.declare_file("%s_values.json" % ctx.label.name)
-        ctx.actions.write(json_values_file, ctx.attr.json)
-        srcs.append(json_values_file)
-
+    srcs = ctx.files.srcs
     src_zip = _zip_src(ctx, srcs)
     merged = _pkg_merge(ctx, src_zip)
 
@@ -123,28 +84,21 @@ def _cue_export_impl(ctx):
     data = depset(transitive = transitive_data).to_list()
 
     # The Cue CLI expects inputs like
-    # cue export <flags> <input_filename>
+    # cue cmd <input_filename> <flags>
     args = ctx.actions.args()
 
     args.add(ctx.executable._cue.path)
     args.add(merged.path)
     args.add(output.path)
 
-    if ctx.attr.escape:
-        args.add("--escape")
     #if ctx.attr.ignore:
     #    args.add("--ignore")
     #if ctx.attr.simplify:
     #    args.add("--simplify")
-    if ctx.attr.all_errors:
-       args.add("--all-errors")
     if ctx.attr.trace:
        args.add("--trace")
     if ctx.attr.verbose:
        args.add("--verbose")
-
-    if ctx.attr.expression:
-       args.add("--expression=%s" % ctx.attr.expression)
 
     for k, v in ctx.attr.inject.items():
         args.add("--inject", "%s=%s" % (k, ctx.expand_location(v, ctx.attr.data)))
@@ -152,27 +106,29 @@ def _cue_export_impl(ctx):
     for k, v in ctx.attr.inject_files.items():
         args.add("--inject", "%s=$(cat %s)" % (v, k))
 
-    args.add_joined(["--out", ctx.attr.output_format], join_with = "=")
-    #args.add(input.path)
+    args.add(ctx.attr.cmd)
 
-    args.add_all([f.basename for f in srcs])
+    # args.add_all([f.basename for f in ctx.files.srcs])
 
     inputs = depset([merged] + data)
 
     ctx.actions.run_shell(
-        mnemonic = "CueExport",
+        mnemonic = "CueCmd",
         tools = [ctx.executable._cue],
         arguments = [args],
         command = """
 set -euo pipefail
+
+set -x
+env
 
 CUE=$1; shift
 PKGZIP=$1; shift
 OUT=$1; shift
 
 unzip -q ${PKGZIP}
-set -x
-exec ${CUE} export -o ${OUT} "$@"
+find .
+exec ${CUE} cmd "$@" > ${OUT}
 """,
         inputs = inputs,
         outputs = [output],
@@ -186,24 +142,8 @@ exec ${CUE} export -o ${OUT} "$@"
         ),
     ]
 
-_cue_export = rule(
-    implementation = _cue_export_impl,
-    attrs = _cue_export_attrs,
-    outputs = _cue_export_outputs,
+cue_cmd = rule(
+    implementation = _cue_cmd_impl,
+    attrs = _cue_cmd_attrs,
+    outputs = _cue_cmd_outputs,
 )
-
-def _json_encode(o):
-  # On next release...!
-  # return json.encode_indent(o)
-
-  json = struct(o=o).to_json()
-  json = json[5:-1]
-  return json
-
-def cue_export(*, name, values=None, **kwargs):
-    _json_values = None
-    if values != None:
-        _json_values = _json_encode(values)
-        kwargs["json"] = _json_values
-
-    _cue_export(name = name, **kwargs)
