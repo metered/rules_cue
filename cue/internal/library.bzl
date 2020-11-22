@@ -24,7 +24,7 @@ PKGZIP=$1; shift
 OUT=$1; shift
 
 unzip -q ${PKGZIP}
-${CUE} def -o ${OUT}
+${CUE} def -o=cue:${OUT}
 """,
         inputs = [merged],
         outputs = [def_out],
