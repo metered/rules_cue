@@ -68,8 +68,8 @@ def _cue_library_impl(ctx):
 
     return [
         DefaultInfo(
-            files = depset([pkg]),
-            runfiles = ctx.runfiles(files = [pkg]),
+            files = depset(ctx.files.srcs),
+            runfiles = ctx.runfiles(files = ctx.files.srcs),
         ),
         CuePkgInfo(
             transitive_pkgs = depset(
